@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maspy-navigation-2D"
+version = "0.1.0"
+description = "Navigation 2D implementation using Maspy."
+requires-python = ">=3.12"
+dependencies = [
+    "maspy-ml==2026.5.13",
+    "maspy-gui==2026.5.13.post3",
+    "pygame>=2.5",
+]
