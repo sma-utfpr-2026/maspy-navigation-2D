@@ -316,7 +316,9 @@ class Walker(Agent):
     def update_walls(self, src, sent_graph):
         wall_set = self.get(Belief("Wall_Set", Any))
         old_set = wall_set.values
-        if sent_graph[0] not in old_set:
-            old_set.append(sent_graph[0])
+        wall = sent_graph[0]
+        if wall not in old_set:
+            old_set.append(wall)
             wall_set.change(values=old_set)
+            self.print(f"added wall {wall} from {src} | total {len(old_set)}")
 
