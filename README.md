@@ -27,6 +27,48 @@ The simulation opens a setup menu where you can configure the map width and heig
 
 `make help` lists all available commands.
 
+## How it works
+
+### Map generation at start
+
+When you click **Start Simulation**, the menu settings build the `Map`:
+
+1. The target cell is placed at random.
+2. Each cell becomes a wall with probability `walls %`. The target is never a wall.
+3. A BFS flood fill starts at the target and visits every reachable free cell.
+4. If any free cell was not reached, the map has an unreachable pocket that would trap an agent. The map is discarded and a new one is generated.
+5. The loop repeats up to 2000 attempts. If none is valid, the program stops with an error.
+
+The console reports how many attempts were needed when a map was discarded.
+
+### Learning mode (not used yet)
+
+Each `Walker` builds an `EnvModel` and runs Q-learning for the number of episodes chosen in the menu, during its constructor. The learned policy is stored, but it is **not used**: `make_move` only reads it when `Belief("use_learn")` exists, and nothing creates that belief. Agents always move randomly until they know the target.
+
+### Agent behavior
+
+- **Wandering (`make_move`)**: each agent picks a random direction every cycle. It has no memory of where it has already been, so it can revisit the same cells many times.
+- **Notebook**: each agent records the cells it walks to in `Path_Graph` and the walls it finds by bumping into them in `Wall_Set`.
+- **Sharing**: after each step the agent broadcasts its notebook. Other agents merge the cells and walls they receive. This shares discoveries, but it does not tell agents which routes were already walked.
+- **Finding the target**: the first agent to reach the target broadcasts it and stops.
+- **Planning (`best_move`)**: once an agent knows the target, it stops wandering. It uses A\* over its notebook to find a path, takes one step, and recalculates the path on every step. Unknown cells cost more than known ones, so the agent prefers known routes but can still explore.
+
+## Known bugs
+
+These bugs are documented in the code. Each one has its own fix branch.
+
+- `draw_ascii_map`: the drawn frame only covers cells the agent walked, so the target and walls outside that area are not drawn. Passing `walls=None` also crashes.
+- `update_walls`: reads `sent_graph[0]`, which is always the sender's first wall. Only that wall is transferred from each sender.
+- Menu: accepts `0` agents, which opens an empty simulation.
+
+## Dead code
+
+These parts are kept for reference and are never called:
+
+- `reconstruct_path` and `reconstruct_path_known` (`Walker_Ag.py`)
+- `reset_positions` (`Map_Env.py`)
+- The `use_learn` branch of `make_move`
+
 ## Clean
 
 ```bash
