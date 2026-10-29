@@ -1,17 +1,18 @@
 """
-MAP_ENV.PY - the navigation map: one target, random walls validated by BFS, and the move() action.
+MAP.PY - the navigation map: two targets, random walls validated by BFS, and the move() action.
 """
 
-from maspy import *
-from maspy.learning import *
+from maspy import Any, Environment, Percept, action
+from maspy.learning import listed
 from collections import deque
-
 import random
 from random import randint
 
+from .targets import TargetTracker
 
-# generate_map_with_walls - random walls, retried until every free cell is reachable from the target (BFS). Returns: (walls, available).
-def generate_map_with_walls(width, height, target, wall_prob=0.1, max_attempts=2000):
+
+# generate_map_with_walls - random walls, retried until every free cell is reachable from a target (BFS). Returns: (walls, available).
+def generate_map_with_walls(width, height, targets, wall_prob=0.1, max_attempts=2000):
     def neighbors(x, y):
         for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
             nx, ny = x+dx, y+dy
@@ -20,13 +21,13 @@ def generate_map_with_walls(width, height, target, wall_prob=0.1, max_attempts=2
 
     # Retry until the BFS reaches every free cell.
     for attempt in range(max_attempts):
-        # Walls; the target is never a wall.
+        # Walls; targets are never walls.
         walls = {(x, y) for x in range(width) for y in range(height)
-                 if random.random() < wall_prob and (x, y) != target}
+                 if random.random() < wall_prob and (x, y) not in targets}
 
-        # Flood fill from the target.
-        queue = deque([target])
-        reachable = {target}
+        # Flood fill from the first target.
+        queue = deque([next(iter(sorted(targets)))])
+        reachable = set(queue)
         while queue:
             cx, cy = queue.popleft()
             for nx, ny in neighbors(cx, cy):
@@ -51,28 +52,36 @@ def generate_map_with_walls(width, height, target, wall_prob=0.1, max_attempts=2
 
 
 # Map - the game board; data lives in the percept bank.
-class Map(Environment):
+class Map(TargetTracker, Environment):
     def __init__(self, map_size=(10, 10), walls_prob=0.1):
         # Environment registration.
         super().__init__()
 
         self.map_size = map_size
 
-        # Random target.
-        target = (randint(0, self.map_size[0] - 1),
-                  randint(0, self.map_size[1] - 1))
+        # Two distinct targets.
+        targets = {(randint(0, self.map_size[0] - 1),
+                    randint(0, self.map_size[1] - 1))}
+        while len(targets) < 2:
+            targets.add((randint(0, self.map_size[0] - 1),
+                         randint(0, self.map_size[1] - 1)))
 
         # Walls + free cells (already connected).
         walls, available = generate_map_with_walls(
-            self.map_size[0], self.map_size[1], target, walls_prob, 2000)
+            self.map_size[0], self.map_size[1], targets, walls_prob, 2000)
 
-        self.print(f"Target is at {target}")
+        self.print(f"Targets are at {sorted(targets)}")
 
-        # Percept bank: target, walls and the free cells.
-        self.create(Percept("target", target))
+        # Percept bank: targets, walls and the free cells.
+        for target in sorted(targets):
+            self.create(Percept("target", target))
         for wall in walls:
             self.create(Percept("wall", wall))
         self.create(Percept("position", available, listed))
+
+        # Public state: how many targets are still up for capture (group "public").
+        self.targets_left = Percept("targets_left", len(targets), "public")
+        self.create(self.targets_left)
 
         # Off-policy: agents may start from any state.
         self.possible_starts = "off-policy"
@@ -93,12 +102,18 @@ class Map(Environment):
         for pos_prcpt in new_pos_prcpts:
             pos_prcpt.change(values=og_pos[pos_prcpt.group])
 
-    # on_connect() - free start cell far from the target.
+    # on_connect() - free start cell far from both targets.
     def on_connect(self, agt):
-        target = self.get(Percept("target", (Any,Any))).values
+        targets = self._target_positions()
+        attempts = 0
         while True:
+            attempts += 1
             start_pos = (randint(0, self.map_size[0]-1), randint(0, self.map_size[1]-1))
-            if not self.has(Percept("wall", start_pos)) and (abs(start_pos[0] - target[0]) + abs(start_pos[1] - target[1])) > self.map_size[0]/2:
+            if self.has(Percept("wall", start_pos)):
+                continue
+            d = min(abs(start_pos[0] - t[0]) + abs(start_pos[1] - t[1])
+                    for t in targets)
+            if d > self.map_size[0] / 2 or attempts > 2000:
                 break
         self.create(Percept("agt_position", start_pos, agt))
         #print(f"MAP> Agent {agt} starts at {start_pos}")
@@ -116,8 +131,7 @@ class Map(Environment):
         terminated = False
 
         new_position = self.moviment(position, direction)
-        target = self.get(Percept("target", (Any, Any)))
-        if new_position == target.values:
+        if new_position in self._target_positions():
             reward = 10
             terminated = True
         elif self.has(Percept("wall", new_position)) or position == new_position:
@@ -143,10 +157,14 @@ class Map(Environment):
                 position.change(values=new_pos)
 
         n_pos = self.get(Percept("agt_position", (Any, Any), agt), ck_group=True).values
-        target = self.get(Percept("target", (Any, Any)))
-        if isinstance(target, Percept) and n_pos == target.values:
-            self.print(f"{agt} in {pos} moves {direction} and arrived at {target.values}")
+
+        # Remaining target: capture; already captured: miss.
+        if n_pos in self._remaining_target_positions():
+            self.print(f"{agt} in {pos} moves {direction} and captured the target at {n_pos}")
             self.create(Percept("arrived_target", n_pos, agt))
+            self._capture(n_pos, agt)
+        elif n_pos in self._captured_target_positions():
+            self.print(f"{agt} in {pos} moves {direction} onto the already captured target {n_pos} (miss)")
         elif wall_flag:
             self.print(f"{agt} in {pos} moves {direction} but hits a wall")
         else:
