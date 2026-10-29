@@ -37,8 +37,8 @@ if __name__ == '__main__':
 
     # One walker per agent.
     walkers = []
-    for i in range(num_walkers):
-        wlk = Walker(f"wk{i}", game_map, episodes)
+    for _ in range(num_walkers):
+        wlk = Walker("wk", game_map, episodes)
         walkers.append(wlk)
         agt_pos = game_map.get(Percept("agt_position", (Any, Any), wlk.my_name), ck_group=True)
         print(f"Walker \"{wlk.my_name}\" connected - starts at {agt_pos.values}")
