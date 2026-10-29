@@ -30,6 +30,10 @@ BG_COLOR = (240, 240, 240)
 GRID_COLOR = (200, 200, 200)
 
 
+def walker_id(name: str) -> str:
+    return name.split("_")[-1]
+
+
 # Button - clickable button with hover and callback.
 class Button:
     def __init__(self, rect, text, callback):
@@ -121,6 +125,9 @@ class MapVisualizer:
             self.map_area_width // env.map_size[0],
             self.map_area_height // env.map_size[1],
         )
+        self.map_width = env.map_size[0] * self.cell_size
+        self.map_height = env.map_size[1] * self.cell_size
+        self.sidebar_x = self.map_width + 20
         pygame.display.set_caption("Map Environment")
         self.clock = pygame.time.Clock()
         # Sidebar buttons act on the MASPY Admin.
@@ -129,7 +136,7 @@ class MapVisualizer:
     # Sidebar: Pause/Resume, More/Less Delay.
     def _create_buttons(self):
         buttons = []
-        x = self.env.map_size[0]*self.cell_size + 20
+        x = self.sidebar_x
         y = 40
         spacing = 60
         actions = [self.action_1, self.action_2, self.action_3]
@@ -148,7 +155,7 @@ class MapVisualizer:
     def action_3(self): Admin().faster_cycle()
 
     def draw_sidebar(self):
-        sidebar_rect = pygame.Rect(self.env.map_size[0]*self.cell_size, 0, SIDEBAR_WIDTH, self.env.map_size[1]*self.cell_size)
+        sidebar_rect = pygame.Rect(self.map_width, 0, SIDEBAR_WIDTH, self.map_height)
         pygame.draw.rect(self.screen, (30, 30, 60), sidebar_rect)
         for btn in self.buttons:
             btn.draw(self.screen)
@@ -161,22 +168,25 @@ class MapVisualizer:
             for cap in self.env.get(Percept("captured_target", (Any, Any)), all=True):
                 pos, owner = cap.values
                 captures[pos] = owner
-        x = self.env.map_size[0]*self.cell_size + 20
+        x = self.sidebar_x
         y = 250
         lines = [f"Targets: {len(targets)}", f"Captured: {len(captures)}"]
-        for pos, owner in sorted(captures.items(), key=lambda kv: kv[0]):
-            lines.append(f"{owner} -> {pos}")
-        if len(captures) == len(targets):
+        game_over = len(captures) == len(targets)
+        if captures:
+            lines.append("Winners:")
+            for pos, owner in sorted(captures.items(), key=lambda kv: int(walker_id(kv[1]))):
+                lines.append(f"  {walker_id(owner)} -> {pos}")
+        if game_over:
             lines.append("GAME OVER")
         for i, line in enumerate(lines):
             text_surf = FONT.render(line, True, TEXT_COLOR)
             self.screen.blit(text_surf, (x, y + i*22))
     
     def draw_map(self):
-        for x in range(0, self.env.map_size[0]*self.cell_size, self.cell_size):
-            pygame.draw.line(self.screen, GRID_COLOR, (x, 0), (x, self.env.map_size[1]*self.cell_size))
-        for y in range(0, self.env.map_size[1]*self.cell_size, self.cell_size):
-            pygame.draw.line(self.screen, GRID_COLOR, (0, y), (self.env.map_size[0]*self.cell_size, y))
+        for x in range(0, self.map_width, self.cell_size):
+            pygame.draw.line(self.screen, GRID_COLOR, (x, 0), (x, self.map_height))
+        for y in range(0, self.map_height, self.cell_size):
+            pygame.draw.line(self.screen, GRID_COLOR, (0, y), (self.map_width, y))
 
         # targets: a red X on every target cell
         if self.env.has(Percept("target", (Any, Any))):
@@ -208,7 +218,7 @@ class MapVisualizer:
 
             pygame.draw.rect(self.screen, AGENT_COLOR,
                              (cx - body//2, cy - body//2, body, body))
-            agent_id = percept.group
+            agent_id = walker_id(percept.group)
             font = pygame.font.SysFont(None, body)
             text = font.render(agent_id, True, (255, 255, 255))
             text_rect = text.get_rect(center=(cx, cy))
