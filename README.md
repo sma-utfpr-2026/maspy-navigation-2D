@@ -1,7 +1,6 @@
 # maspy-navigation-2D
 
-Navigation 2D implementation using [MASPY](https://github.com/laca-is/MASPY), based on the official
-[`2D-Navigation-Learn` example](https://github.com/laca-is/MASPY/tree/main/examples/2D-Navigation-Learn).
+Navigation 2D implementation using [MASPY](https://github.com/laca-is/MASPY), based on the official [`2D-Navigation-Learn` example](https://github.com/laca-is/MASPY/tree/main/examples/2D-Navigation-Learn).
 
 ## Requirements
 
@@ -22,8 +21,7 @@ Creates `.venv` and installs the dependencies.
 make run
 ```
 
-The setup menu configures map size, wall percentage, number of agents and training episodes.
-`make help` lists all commands.
+The setup menu configures map size, wall percentage, number of agents and training episodes. `make help` lists all commands.
 
 ## How it works
 
@@ -37,8 +35,7 @@ The setup menu configures map size, wall percentage, number of agents and traini
 
 ### Learning
 
-Each `Walker` trains Q-learning for the menu's episodes. The policy is stored but **not used**: nothing
-creates `Belief("use_learn")`, so agents always wander.
+Each `Walker` trains Q-learning for the menu's episodes. The policy is stored but **not used**: nothing creates `Belief("use_learn")`, so agents always wander.
 
 ### Agent behavior
 
@@ -46,8 +43,7 @@ creates `Belief("use_learn")`, so agents always wander.
 - Notebook: `Path_Graph` (visited cells) and `Wall_Set` (bumped walls).
 - Sharing: after each step the agent broadcasts its notebook; the others merge it.
 - Finding the target: the first agent to reach it broadcasts the target and stops.
-- `best_move`: once the target is known, A* over the notebook, one step per cycle and replanned each
-  step. Unknown cells cost more.
+- `best_move`: once the target is known, A* over the notebook, one step per cycle and replanned each step. Unknown cells cost more.
 
 ## Known bugs
 
