@@ -1,6 +1,5 @@
 """
-MAP_ENV.PY - the navigation map: one target, random walls validated
-by BFS, and the move() action.
+MAP_ENV.PY - the navigation map: one target, random walls validated by BFS, and the move() action.
 """
 
 from maspy import *
@@ -11,9 +10,7 @@ import random
 from random import randint
 
 
-# generate_map_with_walls - random walls, retried until every free
-# cell is reachable from the target (BFS).
-# Returns: (walls, available).
+# generate_map_with_walls - random walls, retried until every free cell is reachable from the target (BFS). Returns: (walls, available).
 def generate_map_with_walls(width, height, target, wall_prob=0.1, max_attempts=2000):
     def neighbors(x, y):
         for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:

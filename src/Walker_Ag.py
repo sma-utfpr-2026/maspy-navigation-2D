@@ -1,8 +1,7 @@
 """
 WALKER_AG.PY - the Walker agent.
 
-Random walk until a target is known, then A* over the notebook.
-The notebook is shared between walkers by broadcast.
+Random walk until a target is known, then A* over the notebook. The notebook is shared between walkers by broadcast.
 """
 from maspy import *
 from maspy.learning import *

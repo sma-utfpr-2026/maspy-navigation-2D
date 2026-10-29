@@ -1,8 +1,7 @@
 """
 PYGAME_SCREENS.PY - the pygame UI: setup menu and map window.
 
-Button/TextInput are the shared widgets. MenuScreen builds the
-settings; MapVisualizer draws the map and the sidebar.
+Button/TextInput are the shared widgets. MenuScreen builds the settings; MapVisualizer draws the map and the sidebar.
 """
 
 import os
