@@ -1,7 +1,7 @@
 """
 PYGAME_SCREENS.PY - the pygame UI: setup menu and map window.
 
-Button/TextInput are the shared widgets. MenuScreen builds the settings; MapVisualizer draws the map and the sidebar.
+Button/TextInput are the shared widgets. MenuScreen builds the settings; MapVisualizer draws the map, sidebar and competition summary.
 """
 
 import os
@@ -152,6 +152,25 @@ class MapVisualizer:
         pygame.draw.rect(self.screen, (30, 30, 60), sidebar_rect)
         for btn in self.buttons:
             btn.draw(self.screen)
+        # competition summary: target count, captures, GAME OVER.
+        if not self.env.has(Percept("target", (Any, Any))):
+            return
+        targets = self.env.get(Percept("target", (Any, Any)), all=True)
+        captures = {}
+        if self.env.has(Percept("captured_target", (Any, Any))):
+            for cap in self.env.get(Percept("captured_target", (Any, Any)), all=True):
+                pos, owner = cap.values
+                captures[pos] = owner
+        x = self.env.map_size[0]*self.cell_size + 20
+        y = 250
+        lines = [f"Targets: {len(targets)}", f"Captured: {len(captures)}"]
+        for pos, owner in sorted(captures.items(), key=lambda kv: kv[0]):
+            lines.append(f"{owner} -> {pos}")
+        if len(captures) == len(targets):
+            lines.append("GAME OVER")
+        for i, line in enumerate(lines):
+            text_surf = FONT.render(line, True, TEXT_COLOR)
+            self.screen.blit(text_surf, (x, y + i*22))
     
     def draw_map(self):
         for x in range(0, self.env.map_size[0]*self.cell_size, self.cell_size):
@@ -159,17 +178,17 @@ class MapVisualizer:
         for y in range(0, self.env.map_size[1]*self.cell_size, self.cell_size):
             pygame.draw.line(self.screen, GRID_COLOR, (0, y), (self.env.map_size[0]*self.cell_size, y))
 
-        # target from the target percept.
-        target = self.env.get(Percept("target", (Any, Any)))
-        if target:
-            tx, ty = target.values
-            cx, cy = tx * self.cell_size, ty * self.cell_size
-            pygame.draw.line(self.screen, TARGET_COLOR,
-                            (cx + 4, cy + 4),
-                            (cx + self.cell_size - 4, cy + self.cell_size - 4), 3)
-            pygame.draw.line(self.screen, TARGET_COLOR,
-                            (cx + self.cell_size - 4, cy + 4),
-                            (cx + 4, cy + self.cell_size - 4), 3)
+        # targets: a red X on every target cell
+        if self.env.has(Percept("target", (Any, Any))):
+            for target in self.env.get(Percept("target", (Any, Any)), all=True):
+                tx, ty = target.values
+                cx, cy = tx * self.cell_size, ty * self.cell_size
+                pygame.draw.line(self.screen, TARGET_COLOR,
+                                 (cx + 4, cy + 4),
+                                 (cx + self.cell_size - 4, cy + self.cell_size - 4), 3)
+                pygame.draw.line(self.screen, TARGET_COLOR,
+                                 (cx + self.cell_size - 4, cy + 4),
+                                 (cx + 4, cy + self.cell_size - 4), 3)
 
         # Walls from the wall percepts.
         if self.env.has(Percept("wall", (Any, Any))):
@@ -189,7 +208,7 @@ class MapVisualizer:
 
             pygame.draw.rect(self.screen, AGENT_COLOR,
                              (cx - body//2, cy - body//2, body, body))
-            agent_id = percept.group.split("_")[-1]
+            agent_id = percept.group
             font = pygame.font.SysFont(None, body)
             text = font.render(agent_id, True, (255, 255, 255))
             text_rect = text.get_rect(center=(cx, cy))
@@ -268,8 +287,8 @@ class MenuScreen:
             walls_perc = float(self.inputs[2].text) / 100
             agents = int(self.inputs[3].text)
             episodes = int(self.inputs[4].text)
-            if agents < 1:
-                print(f"Simulation needs at least 1 agent (got {agents})")
+            if agents < 2:
+                print(f"The competition needs at least 2 agents (got {agents})")
                 return
             # No training episodes (0) skips the Q-learning phase entirely.
             episodes = episodes if episodes > 0 else None
