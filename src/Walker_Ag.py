@@ -259,7 +259,7 @@ class Walker(Agent):
     # One step per cycle: learned policy or exploration.
     @pl(gain, Goal("move"), Belief("agt_position", (Any,Any), "Map"))
     def make_move(self, src, position):
-        if self.has(Belief("use_learn", adds_event=False)) and not self.has(Belief("explore")):
+        if self.has(Belief("use_learn", adds_event=False)) and not self.has(Belief("explore", adds_event=False)):
             direction, _ = self.get_best_action("Map",(position,))
             self.print(f"From {position} Moving on a Learned Direction ({direction})")
         else:
