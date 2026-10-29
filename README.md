@@ -1,12 +1,11 @@
 # maspy-navigation-2D
 
-Navigation 2D implementation using [MASPY](https://github.com/laca-is/MASPY).
-
-This project is based on a copy of the official [`2D-Navigation-Learn` example](https://github.com/laca-is/MASPY/tree/main/examples/2D-Navigation-Learn) from the [laca-is/MASPY](https://github.com/laca-is/MASPY) repository.
+Navigation 2D implementation using [MASPY](https://github.com/laca-is/MASPY), based on the official
+[`2D-Navigation-Learn` example](https://github.com/laca-is/MASPY/tree/main/examples/2D-Navigation-Learn).
 
 ## Requirements
 
-- [uv](https://docs.astral.sh/uv/getting-started/installation/) (used to create the virtual environment and install dependencies)
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)
 - Python 3.12+
 
 ## Setup
@@ -15,7 +14,7 @@ This project is based on a copy of the official [`2D-Navigation-Learn` example](
 make setup
 ```
 
-This creates the `.venv` virtual environment and installs the project dependencies.
+Creates `.venv` and installs the dependencies.
 
 ## Run
 
@@ -23,47 +22,44 @@ This creates the `.venv` virtual environment and installs the project dependenci
 make run
 ```
 
-The simulation opens a setup menu where you can configure the map width and height, wall percentage, number of agents, and training episodes. Click **Start Simulation** to launch the visualization.
-
-`make help` lists all available commands.
+The setup menu configures map size, wall percentage, number of agents and training episodes.
+`make help` lists all commands.
 
 ## How it works
 
-### Map generation at start
-
-When you click **Start Simulation**, the menu settings build the `Map`:
+### Map generation
 
 1. The target cell is placed at random.
-2. Each cell becomes a wall with probability `walls %`. The target is never a wall.
-3. A BFS flood fill starts at the target and visits every reachable free cell.
-4. If any free cell was not reached, the map has an unreachable pocket that would trap an agent. The map is discarded and a new one is generated.
-5. The loop repeats up to 2000 attempts. If none is valid, the program stops with an error.
+2. Each cell becomes a wall with probability `walls %`; the target is never a wall.
+3. A BFS from the target visits every reachable free cell.
+4. A map with an unreachable free cell is discarded and regenerated (up to 2000 attempts).
+5. The console logs how many attempts were needed.
 
-The console reports how many attempts were needed when a map was discarded.
+### Learning
 
-### Learning mode (not used yet)
-
-Each `Walker` builds an `EnvModel` and runs Q-learning for the number of episodes chosen in the menu, during its constructor. The learned policy is stored, but it is **not used**: `make_move` only reads it when `Belief("use_learn")` exists, and nothing creates that belief. Agents always move randomly until they know the target.
+Each `Walker` trains Q-learning for the menu's episodes. The policy is stored but **not used**: nothing
+creates `Belief("use_learn")`, so agents always wander.
 
 ### Agent behavior
 
-- **Wandering (`make_move`)**: each agent picks a random direction every cycle. It has no memory of where it has already been, so it can revisit the same cells many times.
-- **Notebook**: each agent records the cells it walks to in `Path_Graph` and the walls it finds by bumping into them in `Wall_Set`.
-- **Sharing**: after each step the agent broadcasts its notebook. Other agents merge the cells and walls they receive. This shares discoveries, but it does not tell agents which routes were already walked.
-- **Finding the target**: the first agent to reach the target broadcasts it and stops.
-- **Planning (`best_move`)**: once an agent knows the target, it stops wandering. It uses A\* over its notebook to find a path, takes one step, and recalculates the path on every step. Unknown cells cost more than known ones, so the agent prefers known routes but can still explore.
+- `make_move`: random direction each cycle, with no memory of visited cells.
+- Notebook: `Path_Graph` (visited cells) and `Wall_Set` (bumped walls).
+- Sharing: after each step the agent broadcasts its notebook; the others merge it.
+- Finding the target: the first agent to reach it broadcasts the target and stops.
+- `best_move`: once the target is known, A* over the notebook, one step per cycle and replanned each
+  step. Unknown cells cost more.
 
 ## Known bugs
 
-These bugs are documented in the code. Each one has its own fix branch.
+Documented in the code, each with its own fix branch:
 
-- `draw_ascii_map`: the drawn frame only covers cells the agent walked, so the target and walls outside that area are not drawn. Passing `walls=None` also crashes.
-- `update_walls`: reads `sent_graph[0]`, which is always the sender's first wall. Only that wall is transferred from each sender.
-- Menu: accepts `0` agents, which opens an empty simulation.
+- `draw_ascii_map`: the frame covers only walked cells; `walls=None` crashes.
+- `update_walls`: transfers only the sender's first wall.
+- Menu: accepts `0` agents.
 
 ## Dead code
 
-These parts are kept for reference and are never called:
+Never called, kept for reference:
 
 - `reconstruct_path` and `reconstruct_path_known` (`Walker_Ag.py`)
 - `reset_positions` (`Map_Env.py`)
@@ -75,4 +71,4 @@ These parts are kept for reference and are never called:
 make clean
 ```
 
-Removes the `.venv` virtual environment.
+Removes `.venv`.

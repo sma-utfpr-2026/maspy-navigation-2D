@@ -1,17 +1,8 @@
 """
-PYGAME_SCREENS.PY - the two pygame screens of the project
+PYGAME_SCREENS.PY - the pygame UI: setup menu and map window.
 
-MenuScreen shows the setup form (map size, walls %, agents,
-episodes) and returns the settings tuple once Start is clicked.
-MapVisualizer draws the map window - grid, target, walls and
-agents, all read from the Map's Percepts - plus the sidebar
-whose buttons act on the MASPY Admin itself: Pause/Resume
-freezes/wakes every agent's cycle, More/Less Delay paces it
-(+-1 second per click, floored at 0).
-
-The shared widgets are Button (hover + click callback) and
-TextInput (right-aligned label + editable field). The entry
-point is Walker_Main.py.
+Button/TextInput are the shared widgets. MenuScreen builds the
+settings; MapVisualizer draws the map and the sidebar.
 """
 
 import os
@@ -40,10 +31,7 @@ BG_COLOR = (240, 240, 240)
 GRID_COLOR = (200, 200, 200)
 
 
-# ============================================================
-# Button - a clickable button. Draws itself, highlights on
-# hover, and calls the callback when clicked.
-# ============================================================
+# Button - clickable button with hover and callback.
 class Button:
     def __init__(self, rect, text, callback):
         self.rect = pygame.Rect(rect)
@@ -65,11 +53,7 @@ class Button:
             self.callback()
 
 
-# ============================================================
-# TextInput - a labeled text field. Click to type; the default
-# value clears on the first click and comes back if the field
-# is left empty.
-# ============================================================
+# TextInput - labeled text field used by the menu.
 class TextInput:
     def __init__(self, rect, label, default=""):
         self.rect = pygame.Rect(rect)
@@ -77,7 +61,7 @@ class TextInput:
         self.placeholder = default
         self.text = default
         self.active = False
-        self.cleared = False   # important
+        self.cleared = False
         self.active = False
 
     def draw(self, screen):
@@ -94,9 +78,7 @@ class TextInput:
         screen.blit(txt_surface, (self.rect.x + 10, self.rect.y + 5))
 
     def handle_event(self, event):
-        # mouse click: inside -> activate the field (clearing the
-        # default on the first click); outside -> deactivate
-        # (and restore the default if left empty)
+        # Click activates/clears the field; keys edit it.
         if event.type == pygame.MOUSEBUTTONDOWN:
             if self.rect.collidepoint(event.pos):
                 self.active = True
@@ -108,7 +90,6 @@ class TextInput:
                 if self.text == "":
                     self.text = self.placeholder
                     self.cleared = False
-        # typing: Backspace erases, Enter confirms, anything else appends
         if event.type == pygame.KEYDOWN and self.active:
             if event.key == pygame.K_BACKSPACE:
                 self.text = self.text[:-1]
@@ -127,21 +108,14 @@ class TextInput:
         #         self.text += event.unicode
 
 
-# ============================================================
-# MapVisualizer - the map screen. Draws the grid, the target
-# (red X), the walls (black squares) and the AGENTS (the colored
-# bodies), all read from the Map's Percepts. .draw() renders one
-# frame; .loop() runs the window until it is closed.
-# ============================================================
+# MapVisualizer - map window: grid, target, walls, agents, sidebar.
 class MapVisualizer:
     def __init__(self, env) -> None:
-        # opens the map window and keeps a reference to the Map
-        # (the drawing asks the Map's Percepts, never plain attributes)
+        # Window + reference to the Map (drawing reads percepts).
         pygame.init()
         self.env = env
         self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 
-        # cell size in pixels, so the whole grid fits the window
         self.map_area_width = WINDOW_WIDTH - SIDEBAR_WIDTH
         self.map_area_height = WINDOW_HEIGHT
         self.cell_size = min(
@@ -150,18 +124,10 @@ class MapVisualizer:
         )
         pygame.display.set_caption("Map Environment")
         self.clock = pygame.time.Clock()
-        # the sidebar buttons (actions on the MASPY Admin, below):
+        # Sidebar buttons act on the MASPY Admin.
         self.buttons: list[Button] = self._create_buttons()
 
-    # --------------------------------------------------------
-    # the sidebar buttons - the user's remote control over the
-    # MASPY engine. Each button calls Admin():
-    #   Pause/Resume -> Admin().pause_system()  (freezes/wakes
-    #     EVERY agent's cycle in one shared event)
-    #   More/Less Delay -> Admin().slower_cycle()/faster_cycle()
-    #     (paces the cycle loop up and down)
-    # The widgets are the same Button class the MenuScreen uses.
-    # --------------------------------------------------------
+    # Sidebar: Pause/Resume, More/Less Delay.
     def _create_buttons(self):
         buttons = []
         x = self.env.map_size[0]*self.cell_size + 20
@@ -189,15 +155,12 @@ class MapVisualizer:
             btn.draw(self.screen)
     
     def draw_map(self):
-        # one frame of the map itself: grid, then target, then walls
-
-        # grid
         for x in range(0, self.env.map_size[0]*self.cell_size, self.cell_size):
             pygame.draw.line(self.screen, GRID_COLOR, (x, 0), (x, self.env.map_size[1]*self.cell_size))
         for y in range(0, self.env.map_size[1]*self.cell_size, self.cell_size):
             pygame.draw.line(self.screen, GRID_COLOR, (0, y), (self.env.map_size[0]*self.cell_size, y))
 
-        # draw the target: ask the environment for the "target" percept
+        # target from the target percept.
         target = self.env.get(Percept("target", (Any, Any)))
         if target:
             tx, ty = target.values
@@ -209,7 +172,7 @@ class MapVisualizer:
                             (cx + self.cell_size - 4, cy + 4),
                             (cx + 4, cy + self.cell_size - 4), 3)
 
-        # draw the walls: ask for ALL the "wall" percepts
+        # Walls from the wall percepts.
         if self.env.has(Percept("wall", (Any, Any))):
             walls = self.env.get(Percept("wall", (Any, Any)), all=True)
             if not walls: walls = []
@@ -218,63 +181,50 @@ class MapVisualizer:
                 rect = pygame.Rect(wx * self.cell_size, wy * self.cell_size,
                                    self.cell_size, self.cell_size)
                 pygame.draw.rect(self.screen, (0, 0, 0), rect)
-        # draw agents - the colored bodies. The "agt_position" Percepts
-        # exist because on_connect creates them when each agent
-        # connects. The drawing reads the Percepts directly - no local
-        # copy of any position lives on the screen side.
+        # Agent bodies, from the agt_position percepts.
         for percept in self.env.get(Percept("agt_position", (Any, Any)), all=True):
             x, y = percept.values
             cx = x * self.cell_size + self.cell_size // 2
             cy = y * self.cell_size + self.cell_size // 2
             body = self.cell_size // 4
 
-            # body
             pygame.draw.rect(self.screen, AGENT_COLOR,
                              (cx - body//2, cy - body//2, body, body))
-            # body id
             agent_id = percept.group.split("_")[-1]
             font = pygame.font.SysFont(None, body)
-            text = font.render(agent_id, True, (255, 255, 255))  # black text
+            text = font.render(agent_id, True, (255, 255, 255))
             text_rect = text.get_rect(center=(cx, cy))
 
             self.screen.blit(text, text_rect)
 
-            # legs
             leg_len = self.cell_size // 3
-            # body bottom corners/sides
             bottom_left  = (cx - body//2, cy + body//2)
             bottom_right = (cx + body//2, cy + body//2)
 
-            # left leg (angled left-down)
             pygame.draw.line(self.screen, AGENT_COLOR,
                             bottom_left,
                             (bottom_left[0] - leg_len//2, bottom_left[1] + leg_len), 2)
 
-            # left-mid leg (straight down)
             pygame.draw.line(self.screen, AGENT_COLOR,
                             (cx - body//4, cy + body//2),
                             (cx - body//4, cy + body//2 + leg_len), 2)
 
-            # right-mid leg (straight down)
             pygame.draw.line(self.screen, AGENT_COLOR,
                             (cx + body//4, cy + body//2),
                             (cx + body//4, cy + body//2 + leg_len), 2)
 
-            # right leg (angled right-down)
             pygame.draw.line(self.screen, AGENT_COLOR,
                             bottom_right,
                             (bottom_right[0] + leg_len//2, bottom_right[1] + leg_len), 2)
 
     def draw(self):
-        # one full frame: fill the background, draw the map, show it
         self.screen.fill(BG_COLOR)
         self.draw_map()
         self.draw_sidebar()
         pygame.display.flip()
 
     def loop(self):
-        # the map window's event loop: handles events and redraws the
-        # frame ~30 times per second, until the window is closed
+        # Redraw at ~30 fps until the window closes.
         running = True
         while running:
             try:
@@ -295,11 +245,7 @@ class MapVisualizer:
         pygame.quit()
 
 
-# ============================================================
-# MenuScreen - the setup form. Draws the 5 fields and the Start
-# button; .loop() runs until Start is clicked and returns
-# ((width, height), walls_perc, agents, episodes)
-# ============================================================
+# MenuScreen - setup form; .loop() returns the settings.
 class MenuScreen:
     def __init__(self):
         self.screen = pygame.display.set_mode((400, 400))
@@ -317,7 +263,6 @@ class MenuScreen:
         self.settings = None
 
     def start(self):
-        # called when the Start button is clicked
         try:
             width = int(self.inputs[0].text)
             height = int(self.inputs[1].text)
@@ -328,8 +273,6 @@ class MenuScreen:
             print("Invalid input: every field must be a number")
             return
 
-        # Known gap, to be fixed separately: agents < 1 is accepted here,
-        # which opens a simulation with nobody on the map.
         self.settings = ((width, height), walls_perc, agents, episodes)
         self.done = True
 
@@ -341,8 +284,7 @@ class MenuScreen:
         pygame.display.flip()
 
     def loop(self):
-        # the menu's event loop: polls typing/clicks and redraws the
-        # form until the Start button sets done = True
+        # Poll events and redraw until Start.
         while not self.done:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
