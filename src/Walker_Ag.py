@@ -3,8 +3,10 @@ WALKER_AG.PY - the Walker agent (a random wanderer that becomes an A*
 planner once it knows the target).
 
 Behavior:
-    - Training: EnvModel + Q-learning run in the constructor. The learned
-      policy is not used by the wandering (see make_move).
+    - Training: EnvModel + Q-learning run in the constructor, when the
+      menu's episodes > 0. The learned policy is then used by the
+      wandering branch of make_move (Belief("use_learn")); with no
+      episodes, the agent just wanders randomly.
     - make_move: random walk until the target is found; the agent that
       reaches it first broadcasts Belief("target") and stops.
     - best_move: once Belief("target") exists, moves along an A* path over
@@ -20,11 +22,9 @@ from collections import deque  # used only by reconstruct_path_known (DEAD CODE)
 import heapq  # astar_explore's open set
 
 # Debug drawing of the notebook: '.' = not walked and not a known wall
-# (it may still hide undiscovered walls). Known bugs in this original
-# version, to be fixed separately:
-#   - the frame comes from graph keys only, so the target and walls outside
-#     the walked area are not drawn;
-#   - walls=None (its own default) crashes on 'pos in walls'.
+# (it may still hide undiscovered walls). The original frame covered the
+# graph keys only and crashed on walls=None; both fixed in the
+# `fix/known-bugs` branch.
 def draw_ascii_map(graph, walls=None, target=None):
     if not graph:
         print("(empty graph)")
@@ -196,7 +196,8 @@ class Walker(Agent):
         model.initial_states = {"position": [state.values]}
         #print(f"Agent {self.my_name} starts at {state.values}")
         # Q-learning training runs synchronously here (episodes = the
-        # menu's value). It fills model.q_table; the wandering ignores it.
+        # menu's value). It fills model.q_table; since the learning-mode
+        # integration the wandering does read it (Belief("use_learn")).
         model.learn(qlearning, num_episodes=episodes)
         self.reset_knowledge()
     
@@ -258,9 +259,9 @@ class Walker(Agent):
             self.stop_cycle()
         return False
             
-    # The wandering plan: each cycle picks a random direction and moves.
-    # The learned branch is dead code: nothing creates Belief("use_learn"),
-    # so the wandering is always random. Returns False until the target
+    # The wandering plan: each cycle picks a random direction and moves,
+    # or follows the learned policy when the training phase ran
+    # (Belief("use_learn")). Returns False until the target
     # is reached (MASPY retries the plan every cycle).
     @pl(gain, Goal("move"), Belief("agt_position", (Any,Any), "Map"))
     def make_move(self, src, position):
@@ -309,9 +310,10 @@ class Walker(Agent):
                 old_graph[node] |= neighbors
         map_graph.change(values=old_graph)
 
-    # Known bug, to be fixed separately: sent_graph[0] is the sender's first
-    # wall forever (the sender resends its whole list), so only that one
-    # wall ever transfers from each sender.
+    # Receivers of the walls shared by the other walkers. The sender
+    # appends each new wall last and resends its whole list. Reading
+    # sent_graph[-1] picks the wall just added (fixed in fix/known-bugs;
+    # the original sent_graph[0] only ever transferred the first wall).
     @pl(gain, Belief("Sent_Walls", Any), plan_type=atomic)
     def update_walls(self, src, sent_graph):
         wall_set = self.get(Belief("Wall_Set", Any))

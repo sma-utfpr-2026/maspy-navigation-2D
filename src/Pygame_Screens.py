@@ -328,8 +328,8 @@ class MenuScreen:
             print("Invalid input: every field must be a number")
             return
 
-        # Known gap, to be fixed separately: agents < 1 is accepted here,
-        # which opens a simulation with nobody on the map.
+        # agents < 1 is accepted here and opens an empty simulation;
+        # fixed in the `fix/known-bugs` branch (menu requires at least 1).
         self.settings = ((width, height), walls_perc, agents, episodes)
         self.done = True
 

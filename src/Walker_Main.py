@@ -2,8 +2,9 @@
 WALKER_MAIN.PY - how the simulation starts
 
 Starts the MASPY Admin, opens the setup menu, builds the Map and
-the walkers (each constructor connects AND trains), starts the
-system thread, and shows the pygame screen with everything on it.
+the walkers (each constructor connects, and trains when episodes
+> 0), starts the system thread, and shows the pygame screen with
+everything on it.
 """
 
 from maspy import Admin, Percept, Any, Channel

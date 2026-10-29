@@ -41,9 +41,9 @@ When you click **Start Simulation**, the menu settings build the `Map`:
 
 The console reports how many attempts were needed when a map was discarded.
 
-### Learning mode (not used yet)
+### Learning mode
 
-Each `Walker` builds an `EnvModel` and runs Q-learning for the number of episodes chosen in the menu, during its constructor. The learned policy is stored, but it is **not used**: `make_move` only reads it when `Belief("use_learn")` exists, and nothing creates that belief. Agents always move randomly until they know the target.
+Each `Walker` builds an `EnvModel` and runs Q-learning for the number of episodes chosen in the menu, during its constructor. The menu treats `0` episodes as "no training": those agents just wander randomly. When the training runs, the learned policy is stored and `make_move` reads it while `Belief("use_learn")` exists - the belief is added by the constructor when the training finishes (see the `chore/equalize-class-presentation-from-author` branch).
 
 ### Agent behavior
 
@@ -55,11 +55,11 @@ Each `Walker` builds an `EnvModel` and runs Q-learning for the number of episode
 
 ## Known bugs
 
-These bugs are documented in the code. Each one has its own fix branch.
+These bugs were found and documented here first. They were fixed in the `fix/known-bugs` branch, already integrated in the stable version (`stabilize-project`):
 
-- `draw_ascii_map`: the drawn frame only covers cells the agent walked, so the target and walls outside that area are not drawn. Passing `walls=None` also crashes.
-- `update_walls`: reads `sent_graph[0]`, which is always the sender's first wall. Only that wall is transferred from each sender.
-- Menu: accepts `0` agents, which opens an empty simulation.
+- ~~`draw_ascii_map`: the drawn frame only covers cells the agent walked, so the target and walls outside that area are not drawn. Passing `walls=None` also crashes.~~ Fixed: the frame now covers every known cell and `walls=None` is handled.
+- ~~`update_walls`: reads `sent_graph[0]`, which is always the sender's first wall. Only that wall is transferred from each sender.~~ Fixed: it reads `sent_graph[-1]`, the wall the sender just added.
+- ~~Menu: accepts `0` agents, which opens an empty simulation.~~ Fixed: the menu requires at least 1 agent.
 
 ## Dead code
 
@@ -67,7 +67,9 @@ These parts are kept for reference and are never called:
 
 - `reconstruct_path` and `reconstruct_path_known` (`Walker_Ag.py`)
 - `reset_positions` (`Map_Env.py`)
-- The `use_learn` branch of `make_move`
+
+(The `use_learn` branch of `make_move` used to be listed here too; it is
+active since the learning-mode integration on `stabilize-project`.)
 
 ## Clean
 
