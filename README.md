@@ -95,7 +95,7 @@ Among these, only `targets_left`, `agt_position` and `arrived_target` reach an a
 
 Marked in the source with `# DEAD CODE (never called).`
 
-- `best_move`, `update_graph`, `update_walls` (`Walker_Ag.py`, commented out so MASPY does not register the plans)
+- `best_move`, `update_graph`, `update_walls` (`Walker_Ag.py`, still defined. MASPY register the plans, but they are unreacheable because the context is not satisfied)
 - `reconstruct_path`, `reconstruct_path_known` (`Walker_Ag.py`, still defined)
 - `reset_positions` (`env/map.py`, still defined)
 
