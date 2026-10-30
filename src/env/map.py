@@ -92,16 +92,6 @@ class Map(TargetTracker, Environment):
             "right": (1, 0), "left": (-1, 0),
         }
 
-    # DEAD CODE (never called).
-    def reset_positions(self, og_pos):
-        found_pos = self.get(Percept("arrived_target", (Any, Any)), all=True)
-        assert isinstance(found_pos, list)
-        self.delete(found_pos)
-        new_pos_prcpts = self.get(Percept("agt_position", (Any, Any)), all=True)
-        assert isinstance(new_pos_prcpts, list)
-        for pos_prcpt in new_pos_prcpts:
-            pos_prcpt.change(values=og_pos[pos_prcpt.group])
-
     # on_connect() - free start cell far from both targets.
     def on_connect(self, agt):
         targets = self._target_positions()
