@@ -91,14 +91,6 @@ Among these, only `targets_left`, `agt_position` and `arrived_target` reach an a
 - The first agent to reach a target captures it, broadcasts `target_lost` through the channel and stops; the others keep searching.
 - The game ends when both targets are captured. The last capturer sees `targets_left == 0`, broadcasts `game_over` and stops; the others stop when they receive it. The sidebar lists the captures and shows `GAME OVER`.
 
-## Dead code
-
-Marked in the source with `# DEAD CODE (never called).`
-
-- `best_move`, `update_graph`, `update_walls` (`Walker_Ag.py`, still defined. MASPY register the plans, but they are unreacheable because the context is not satisfied)
-- `reconstruct_path`, `reconstruct_path_known` (`Walker_Ag.py`, still defined)
-- `reset_positions` (`env/map.py`, still defined)
-
 ## Clean
 
 ```bash
