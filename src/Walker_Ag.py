@@ -200,12 +200,12 @@ class Walker(Agent):
             # Train synchronously, then use the learned policy.
             model.learn(qlearning, num_episodes=episodes)
             self.print("This process will use the trained model for execution")
-            self.add(Belief("use_learn", adds_event=False))
+            self.add(Belief("mode", "use_learn", adds_event=False))
         else:
             self.print("This process will not run the training")
             self.connect_to(map)
             # No training: explore from the first cycle.
-            self.add(Belief("explore", adds_event=False))
+            self.add(Belief("mode", "explore", adds_event=False))
 
         self.reset_knowledge()
     
@@ -264,7 +264,7 @@ class Walker(Agent):
     # One step per cycle: learned policy or exploration.
     @pl(gain, Goal("move"), Belief("agt_position", (Any,Any), "Map"))
     def make_move(self, src, position):
-        if self.has(Belief("use_learn", adds_event=False)) and not self.has(Belief("explore", adds_event=False)):
+        if self.get(Belief("mode", "use_learn", adds_event=False)) is not None:
             direction, _ = self.get_best_action("Map",(position,))
             self.print(f"From {position} Moving on a Learned Direction ({direction})")
         else:
@@ -323,8 +323,9 @@ class Walker(Agent):
     # Channel notification from the capturer: trained walkers switch to exploration.
     @pl(gain, Belief("target_lost", (Any,Any)), plan_type=atomic)
     def on_target_lost(self, src, *args):
-        if self.has(Belief("use_learn", adds_event=False)) and not self.has(Belief("explore", adds_event=False)):
-            self.add(Belief("explore", adds_event=False))
+        mode_belief = self.get(Belief("mode", "use_learn", adds_event=False))
+        if mode_belief is not None:
+            mode_belief.change("mode", "explore", adds_event=False)
             self.print(f"Target captured by {src} - switching to exploration")
 
     # Channel notification that every target was captured: stop the walker.
