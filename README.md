@@ -35,23 +35,15 @@ The setup menu configures map size, wall percentage, number of agents and traini
 
 ### Learning
 
-Each `Walker` trains Q-learning for the menu's episodes. The policy is stored but **not used**: nothing creates `Belief("use_learn")`, so agents always wander.
+Each `Walker` trains Q-learning for the menu's episodes (`0` = no training). When training runs, the learned policy is stored and `make_move` follows it while `Belief("use_learn")` exists.
 
 ### Agent behavior
 
-- `make_move`: random direction each cycle, with no memory of visited cells.
+- `make_move`: random direction each cycle, or the learned policy when training ran.
 - Notebook: `Path_Graph` (visited cells) and `Wall_Set` (bumped walls).
 - Sharing: after each step the agent broadcasts its notebook; the others merge it.
 - Finding the target: the first agent to reach it broadcasts the target and stops.
 - `best_move`: once the target is known, A* over the notebook, one step per cycle and replanned each step. Unknown cells cost more.
-
-## Known bugs
-
-Documented in the code, each with its own fix branch:
-
-- `draw_ascii_map`: the frame covers only walked cells; `walls=None` crashes.
-- `update_walls`: transfers only the sender's first wall.
-- Menu: accepts `0` agents.
 
 ## Dead code
 
@@ -59,7 +51,6 @@ Never called, kept for reference:
 
 - `reconstruct_path` and `reconstruct_path_known` (`Walker_Ag.py`)
 - `reset_positions` (`Map_Env.py`)
-- The `use_learn` branch of `make_move`
 
 ## Clean
 

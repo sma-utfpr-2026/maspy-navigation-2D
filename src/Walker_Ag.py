@@ -11,20 +11,24 @@ import heapq  # astar_explore's open set
 
 # Debug drawing of the notebook ('.' = unknown).
 def draw_ascii_map(graph, walls=None, target=None):
-    if not graph:
+    walls = list(walls) if walls else []
+    points_to_draw = set(graph) | set(walls)
+    if target is not None:
+        points_to_draw.add(target)
+    if not points_to_draw:
         print("(empty graph)")
         return
-    ys = [x for x, _ in graph.keys()]
-    xs = [y for _, y in graph.keys()]
-    min_x, max_x = min(xs), max(xs)
-    min_y, max_y = min(ys), max(ys)
+    min_x = min(p[0] for p in points_to_draw)
+    max_x = max(p[0] for p in points_to_draw)
+    min_y = min(p[1] for p in points_to_draw)
+    max_y = max(p[1] for p in points_to_draw)
     print("  ", end="")
-    for x in range(min_y, max_y + 1):
+    for x in range(min_x, max_x + 1):
         print(f"{x} ", end="")
     print()
-    for y in range(min_x, max_x + 1):
+    for y in range(min_y, max_y + 1):
         row = f"{y} "
-        for x in range(min_y, max_y + 1):
+        for x in range(min_x, max_x + 1):
             pos = (x, y)
 
             if pos == target:
@@ -154,19 +158,27 @@ def astar_direction(ag, position, target):
     return direction
 
 class Walker(Agent):
-    def __init__(self, name, map: Environment, episodes: int):
+    def __init__(self, name, map: Environment, episodes: int | None):
         super().__init__(name, max_intentions=1)
         # Perceive only own position; add_policy also connects the map.
         self.filter_perceptions(add, focus, self.my_name)
         #self.show_slct = True
         #self.show_cycle = True
-        model = EnvModel(map, self, True)
-        self.add_policy(model)
-        state = model.env.get(Percept("agt_position", (Any, Any), self.my_name), ck_group=True)
-        assert isinstance(state, Percept)
-        model.initial_states = {"position": [state.values]}
-        # Train synchronously.
-        model.learn(qlearning, num_episodes=episodes)
+        if episodes is not None:
+            model = EnvModel(map, self, show_learning=True)
+            self.add_policy(model)
+            state = model.env.get(Percept("agt_position", (Any, Any), self.my_name), ck_group=True)
+            assert isinstance(state, Percept)
+            model.initial_states = {"position": [state.values]}
+            print(f"Agent {self.my_name} starts at {state.values}")
+            # Train synchronously, then use the learned policy.
+            model.learn(qlearning, num_episodes=episodes)
+            self.print("This process will use the trained model for execution")
+            self.add(Belief("use_learn", adds_event=False))
+        else:
+            self.print("This process will not run the training")
+            self.connect_to(map)
+
         self.reset_knowledge()
     
     # Empty notebook + the Goal("move") trigger.
@@ -218,10 +230,10 @@ class Walker(Agent):
             self.stop_cycle()
         return False
             
-    # Random step (or learned policy); stop on arrival and broadcast the target.
+    # Random step or learned policy; stop on arrival and broadcast the target.
     @pl(gain, Goal("move"), Belief("agt_position", (Any,Any), "Map"))
     def make_move(self, src, position):
-        if self.has(Belief("use_learn")):
+        if self.has(Belief("use_learn", adds_event=False)):
             direction, _ = self.get_best_action("Map",(position,))
             self.print(f"From {position} Moving on a Learned Direction ({direction})")
         else:
@@ -264,7 +276,7 @@ class Walker(Agent):
     def update_walls(self, src, sent_graph):
         wall_set = self.get(Belief("Wall_Set", Any))
         old_set = wall_set.values
-        wall = sent_graph[0]
+        wall = sent_graph[-1]
         if wall not in old_set:
             old_set.append(wall)
             wall_set.change(values=old_set)

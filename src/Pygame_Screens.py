@@ -268,12 +268,16 @@ class MenuScreen:
             walls_perc = float(self.inputs[2].text) / 100
             agents = int(self.inputs[3].text)
             episodes = int(self.inputs[4].text)
+            if agents < 1:
+                print(f"Simulation needs at least 1 agent (got {agents})")
+                return
+            # No training episodes (0) skips the Q-learning phase entirely.
+            episodes = episodes if episodes > 0 else None
+            self.settings = ((width, height), walls_perc, agents, episodes)
+            self.done = True
         except ValueError:
             print("Invalid input: every field must be a number")
             return
-
-        self.settings = ((width, height), walls_perc, agents, episodes)
-        self.done = True
 
     def draw(self):
         self.screen.fill((20, 20, 50))
