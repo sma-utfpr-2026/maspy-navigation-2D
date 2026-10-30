@@ -73,8 +73,7 @@ Among these, only `targets_left`, `agt_position` and `arrived_target` reach an a
 | `arrived_target` | `Map` perception (capturer only) | private | handle a capture |
 | `Path_Graph` | own exploration | private | visited cells / discovered graph |
 | `Wall_Set` | own bumps | private | discovered walls |
-| `use_learn` | own configuration | private | use the learned policy |
-| `explore` | own configuration or `target_lost` | private | force exploration |
+| `mode` | `own configuration` or `target_lost` (trigger) | `private` | Indicates the current walker state:<br>• **`"use_learn"`** – the walker follows the trained policy.<br>• **`"explore"`** – the walker performs pure exploration (or switches to exploration after a `target_lost` event). |
 | `target_lost` | channel message | private | switch trained walkers to exploration |
 | `game_over` | channel message | private | stop the walker |
 
