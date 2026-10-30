@@ -216,7 +216,7 @@ class Walker(Agent):
                 # self.send(broadcast, tell, Belief("Sent_Walls", walls))
 
     # One step per cycle: learned policy or exploration.
-    @pl(gain, Goal("move"), Belief("agt_position", (Any, Any), Any))
+    @pl(gain, Goal("move"), Belief("agt_position", (Any, Any), "Map"))
     def make_move(self, src, position):
         mode_belief = self.get(Belief("mode", Any, adds_event=False))
         if mode_belief is not None and mode_belief.values == "use_learn":
