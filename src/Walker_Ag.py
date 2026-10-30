@@ -5,7 +5,7 @@ Untrained: exploration. Trained: learned policy until find the first target, the
 """
 from maspy import *
 from maspy.learning import *
-from random import choice, randint  # random step when there is no unexplored neighbor
+from random import choice, randint
 # DEAD CODE (never called).
 from collections import deque
 import heapq  # astar_explore's open set
@@ -228,6 +228,8 @@ class Walker(Agent):
             old_graph.setdefault(position, set()).add(new_pos.values)
             old_graph.setdefault(new_pos.values, set()).add(position)
             map_graph.change(values=old_graph)
+            # Remove sharing knowledge about freely discovered cells with other agents (because of competition mode)
+            # self.send(broadcast, tell, Belief("Sent_Graph", old_graph))
         if new_pos.values == position and direction != "stay":
             match direction:
                 case "up": wall_pos = (position[0],position[1]-1)
@@ -238,23 +240,26 @@ class Walker(Agent):
             if wall_pos not in walls:
                 walls.append(wall_pos)
                 self.print(f"Driver {self.my_name} found a wall at {wall_pos} added to {walls}")
+                # Remove sharing knowledge about discovered walls with other agents (because of competition mode)
+                # self.send(broadcast, tell, Belief("Sent_Walls", walls))
 
     # DEAD CODE (never called).
-    # @pl(gain, Goal("move"), Belief("target", (Any,Any)) & Belief("agt_position", (Any,Any), "Map"))
-    # def best_move(self, src, target, position):
-    #     direction = astar_direction(self, position, target)
-    #     self.print(f'Knowing target {target} and my position {position}  - moving {direction}')
-    #     if direction != "stay": self.move(direction)
-    #
-    #     self.perceive("Map")
-    #     self.update_map(position, direction)
-    #
-    #     if not self.has(Belief("arrived_target", (Any,Any), "Map")):
-    #         return False
-    #     else:
-    #         self.print(f"Driver {self.my_name} arrived at {target}")
-    #         self.stop_cycle()
-    #     return False
+    # Once the target is known: one A* step per cycle.
+    @pl(gain, Goal("move"), Belief("target", (Any,Any)) & Belief("agt_position", (Any,Any), "Map"))
+    def best_move(self, src, target, position):
+        direction = astar_direction(self, position, target)
+        self.print(f'Knowing target {target} and my position {position}  - moving {direction}')
+        if direction != "stay": self.move(direction)
+    
+        self.perceive("Map")
+        self.update_map(position, direction)
+    
+        if not self.has(Belief("arrived_target", (Any,Any), "Map")):
+            return False
+        else:
+            self.print(f"Driver {self.my_name} arrived at {target}")
+            self.stop_cycle()
+        return False
 
     # One step per cycle: learned policy or exploration.
     @pl(gain, Goal("move"), Belief("agt_position", (Any,Any), "Map"))
@@ -290,6 +295,31 @@ class Walker(Agent):
             self.print(f"Target {target.values} captured - notifying the other walkers")
         self.stop_cycle()
 
+    # DEAD CODE (never called).
+    # Merge notebooks received from other walkers.
+    @pl(gain, Belief("Sent_Graph", Any), plan_type=atomic)
+    def update_graph(self, src, sent_graph):
+        map_graph = self.get(Belief("Path_Graph", Any))
+        old_graph = map_graph.values
+        for node, neighbors in sent_graph.items():
+            if node not in old_graph:
+                old_graph[node] = set(neighbors)
+            else:
+                old_graph[node] |= neighbors
+        map_graph.change(values=old_graph)
+
+    # DEAD CODE (never called).
+    # Merge a wall received from other walkers.
+    @pl(gain, Belief("Sent_Walls", Any), plan_type=atomic)
+    def update_walls(self, src, sent_graph):
+        wall_set = self.get(Belief("Wall_Set", Any))
+        old_set = wall_set.values
+        wall = sent_graph[-1]
+        if wall not in old_set:
+            old_set.append(wall)
+            wall_set.change(values=old_set)
+            self.print(f"added wall {wall} from {src} | total {len(old_set)}")
+
     # Channel notification from the capturer: trained walkers switch to exploration.
     @pl(gain, Belief("target_lost", (Any,Any)), plan_type=atomic)
     def on_target_lost(self, src, *args):
@@ -302,26 +332,3 @@ class Walker(Agent):
     def on_game_over(self, src, *args):
         self.print("Game over - every target was captured, stopping")
         self.stop_cycle()
-
-    # DEAD CODE (never called).
-    # @pl(gain, Belief("Sent_Graph", Any), plan_type=atomic)
-    # def update_graph(self, src, sent_graph):
-    #     map_graph = self.get(Belief("Path_Graph", Any))
-    #     old_graph = map_graph.values
-    #     for node, neighbors in sent_graph.items():
-    #         if node not in old_graph:
-    #             old_graph[node] = set(neighbors)
-    #         else:
-    #             old_graph[node] |= neighbors
-    #     map_graph.change(values=old_graph)
-
-    # DEAD CODE (never called).
-    # @pl(gain, Belief("Sent_Walls", Any), plan_type=atomic)
-    # def update_walls(self, src, sent_graph):
-    #     wall_set = self.get(Belief("Wall_Set", Any))
-    #     old_set = wall_set.values
-    #     wall = sent_graph[-1]
-    #     if wall not in old_set:
-    #         old_set.append(wall)
-    #         wall_set.change(values=old_set)
-    #         self.print(f"added wall {wall} from {src} | total {len(old_set)}")
