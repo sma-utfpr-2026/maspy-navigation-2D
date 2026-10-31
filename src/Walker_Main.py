@@ -26,9 +26,9 @@ if __name__ == '__main__':
 
     # Map; targets and walls are percepts.
     game_map = Map(map_size, walls_perc)
-
-    targets = game_map.get(Percept("target", (Any, Any)), all=True)
-    walls = game_map.get(Percept("wall", (Any, Any)), all=True)
+    
+    targets = game_map.get(Percept("target", (Any, Any, Any)), all=True) or []
+    walls = game_map.get(Percept("wall", (Any, Any)), all=True) or []
     print("Map -> targets:", [t.values for t in targets], f"| walls: {len(walls)}")
 
     # State space = all free cells.

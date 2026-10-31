@@ -1,40 +1,48 @@
 """
 TARGETS.PY - target/capture bookkeeping for the Map, kept out of the environment class.
 """
-
 from maspy import Any, Percept
 
-
-# TargetTracker - reads and updates the "target"/"captured_target" percepts of a Map.
 class TargetTracker:
-    # Positions of every target.
+    # Returns the (x, y) coordinates of every registered target.
     def _target_positions(self):
-        if not self.has(Percept("target", (Any, Any))):
+        if not self.has(Percept("target", (Any, Any, Any))):
             return []
-        targets = self.get(Percept("target", (Any, Any)), all=True)
-        return [t.values for t in targets]
+        targets = self.get(Percept("target", (Any, Any, Any)), all=True)
+        return [(t.values[0], t.values[1]) for t in targets]
 
-    # Positions already captured.
+    # Returns a dictionary mapping (x, y) coordinates to target point values.
+    def _target_values_map(self):
+        if not self.has(Percept("target", (Any, Any, Any))):
+            return {}
+        targets = self.get(Percept("target", (Any, Any, Any)), all=True)
+        return {(t.values[0], t.values[1]): t.values[2] for t in targets}
+
+    # Positions of targets that have already been captured.
     def _captured_target_positions(self):
-        if not self.has(Percept("captured_target", (Any, Any))):
+        if not self.has(Percept("captured_target", (Any, Any, Any))):
             return []
-        captured = self.get(Percept("captured_target", (Any, Any)), all=True)
+        captured = self.get(Percept("captured_target", (Any, Any, Any)), all=True)
+        # c.values is (pos, val, agt), so pos is c.values[0].
         return [c.values[0] for c in captured]
 
-    # Targets still up for capture.
+    # Positions of targets that are still available for capture.
     def _remaining_target_positions(self):
         captured = self._captured_target_positions()
-        return [t for t in self._target_positions() if t not in captured]
+        return [pos for pos in self._target_positions() if pos not in captured]
 
-    # _capture() - record the capture and publish how many targets are left.
-    def _capture(self, pos, agt):
-        self.create(Percept("captured_target", (pos, agt)))
-        self.print(f"{agt} captured the target at {pos}")
+    # _capture() - records the capture by storing (position, value, agent).
+    def _capture(self, pos, val, agt):
+        self.create(Percept("captured_target", (pos, val, agt)))
+        self.print(f"{agt} captured the target at {pos} worth {val} points!")
 
         remaining = self._remaining_target_positions()
         self.targets_left.change(values=(len(remaining),))
         if not remaining:
-            winners = sorted({c.values[1] for c in
-                              self.get(Percept("captured_target", (Any, Any)), all=True) or []})
-            self.print(f"GAME OVER - all targets captured by {winners}. "
-                       f"Close the pygame window when done.")
+            all_captures = self.get(Percept("captured_target", (Any, Any, Any)), all=True) or []
+            # Rank agents by highest captured value.
+            ranking = sorted(all_captures, key=lambda c: c.values[1], reverse=True)
+            self.print(f"=== GAME OVER ===")
+            for rank, cap in enumerate(ranking, 1):
+                p, v, a = cap.values
+                self.print(f"  {rank} Place: {a} with {v} points (at {p})")

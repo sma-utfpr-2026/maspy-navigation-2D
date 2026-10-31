@@ -14,13 +14,13 @@ from maspy import Admin, Percept, Any
 os.environ['SDL_VIDEO_CENTERED'] = '1'
 
 pygame.init()
-FONT = pygame.font.SysFont(None, 24)        # form text
-# menu form colors
+FONT = pygame.font.SysFont(None, 24)        # Form text
+# Menu form colors
 TEXT_COLOR = (255, 255, 255)
 BUTTON_COLOR = (80, 80, 200)
 BUTTON_HOVER = (100, 100, 250)
 
-# map screen
+# Map screen dimensions and colors
 WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 800
 SIDEBAR_WIDTH = 200
@@ -65,7 +65,6 @@ class TextInput:
         self.text = default
         self.active = False
         self.cleared = False
-        self.active = False
 
     def draw(self, screen):
         color = (180, 180, 180) if not self.cleared else (255, 255, 255)
@@ -75,7 +74,6 @@ class TextInput:
         else:
             pygame.draw.rect(screen, (120, 120, 120), self.rect, 2)
         txt_surface = FONT.render(self.text, True, color)
-        #txt_surface = FONT.render(self.text, True, TEXT_COLOR)
         label_surface = FONT.render(self.label, True, TEXT_COLOR)
         screen.blit(label_surface, (self.rect.x - 120, self.rect.y + 5))
         screen.blit(txt_surface, (self.rect.x + 10, self.rect.y + 5))
@@ -100,15 +98,6 @@ class TextInput:
                 self.active = False
             else:
                 self.text += event.unicode
-        # if event.type == pygame.MOUSEBUTTONDOWN:
-        #     self.active = self.rect.collidepoint(event.pos)
-        # if event.type == pygame.KEYDOWN and self.active:
-        #     if event.key == pygame.K_RETURN:
-        #         self.active = False
-        #     elif event.key == pygame.K_BACKSPACE:
-        #         self.text = self.text[:-1]
-        #     elif event.unicode.isdigit():
-        #         self.text += event.unicode
 
 
 # MapVisualizer - map window: grid, target, walls, agents, sidebar.
@@ -143,8 +132,8 @@ class MapVisualizer:
         names = ["Pause/Resume", "More Delay", "Less Delay"]
         for i, func in enumerate(actions):
             btn = Button(
-                rect=(x, y + i*spacing, SIDEBAR_WIDTH-40, 40),
-                text= names[i],
+                rect=(x, y + i * spacing, SIDEBAR_WIDTH - 40, 40),
+                text=names[i],
                 callback=func
             )
             buttons.append(btn)
@@ -159,28 +148,30 @@ class MapVisualizer:
         pygame.draw.rect(self.screen, (30, 30, 60), sidebar_rect)
         for btn in self.buttons:
             btn.draw(self.screen)
-        # competition summary: target count, captures, GAME OVER.
-        if not self.env.has(Percept("target", (Any, Any))):
+        # Competition summary: target count, captures, GAME OVER.
+        if not self.env.has(Percept("target", (Any, Any, Any))):
             return
-        targets = self.env.get(Percept("target", (Any, Any)), all=True)
-        captures = {}
-        if self.env.has(Percept("captured_target", (Any, Any))):
-            for cap in self.env.get(Percept("captured_target", (Any, Any)), all=True):
-                pos, owner = cap.values
-                captures[pos] = owner
+        targets = self.env.get(Percept("target", (Any, Any, Any)), all=True)
+        captures = []
+        if self.env.has(Percept("captured_target", (Any, Any, Any))):
+            for cap in self.env.get(Percept("captured_target", (Any, Any, Any)), all=True):
+                pos, val, owner = cap.values
+                captures.append((owner, val, pos))
+
         x = self.sidebar_x
         y = 250
         lines = [f"Targets: {len(targets)}", f"Captured: {len(captures)}"]
         game_over = len(captures) == len(targets)
         if captures:
-            lines.append("Winners:")
-            for pos, owner in sorted(captures.items(), key=lambda kv: int(walker_id(kv[1]))):
-                lines.append(f"  {walker_id(owner)} -> {pos}")
+            lines.append("Ranking:")
+            # Sort by highest point value.
+            for owner, val, pos in sorted(captures, key=lambda item: item[1], reverse=True):
+                lines.append(f"  {walker_id(owner)}: +{val} pts")
         if game_over:
             lines.append("GAME OVER")
         for i, line in enumerate(lines):
             text_surf = FONT.render(line, True, TEXT_COLOR)
-            self.screen.blit(text_surf, (x, y + i*22))
+            self.screen.blit(text_surf, (x, y + i * 22))
     
     def draw_map(self):
         for x in range(0, self.map_width, self.cell_size):
@@ -188,17 +179,24 @@ class MapVisualizer:
         for y in range(0, self.map_height, self.cell_size):
             pygame.draw.line(self.screen, GRID_COLOR, (0, y), (self.map_width, y))
 
-        # targets: a red X on every target cell
-        if self.env.has(Percept("target", (Any, Any))):
-            for target in self.env.get(Percept("target", (Any, Any)), all=True):
-                tx, ty = target.values
+        # Targets: an X with value label on every target cell.
+        if self.env.has(Percept("target", (Any, Any, Any))):
+            for target in self.env.get(Percept("target", (Any, Any, Any)), all=True):
+                tx, ty, val = target.values
                 cx, cy = tx * self.cell_size, ty * self.cell_size
-                pygame.draw.line(self.screen, TARGET_COLOR,
-                                 (cx + 4, cy + 4),
+                
+                # Gold for the 100-point target, Red for the 40-point target.
+                color = (255, 215, 0) if val >= 100 else (255, 60, 60)
+                
+                pygame.draw.line(self.screen, color, (cx + 4, cy + 4),
                                  (cx + self.cell_size - 4, cy + self.cell_size - 4), 3)
-                pygame.draw.line(self.screen, TARGET_COLOR,
-                                 (cx + self.cell_size - 4, cy + 4),
+                pygame.draw.line(self.screen, color, (cx + self.cell_size - 4, cy + 4),
                                  (cx + 4, cy + self.cell_size - 4), 3)
+                
+                # Display target value above cell.
+                v_font = pygame.font.SysFont(None, max(14, self.cell_size // 3))
+                lbl = v_font.render(str(val), True, (20, 20, 20))
+                self.screen.blit(lbl, (cx + 4, cy + 4))
 
         # Walls from the wall percepts.
         if self.env.has(Percept("wall", (Any, Any))):
@@ -209,6 +207,7 @@ class MapVisualizer:
                 rect = pygame.Rect(wx * self.cell_size, wy * self.cell_size,
                                    self.cell_size, self.cell_size)
                 pygame.draw.rect(self.screen, (0, 0, 0), rect)
+
         # Agent bodies, from the agt_position percepts.
         for percept in self.env.get(Percept("agt_position", (Any, Any)), all=True):
             x, y = percept.values

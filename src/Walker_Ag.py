@@ -193,33 +193,34 @@ class Walker(Agent):
     def update_map(self, position, direction):
         map_graph = self.get(Belief("Path_Graph", Any))
         wall_list = self.get(Belief("Wall_Set", Any))
-        new_pos = self.get(Belief("agt_position", (Any,Any), "Map"))
+        new_pos = self.get(Belief("agt_position", (Any, Any), "Map"))
         assert (map_graph and wall_list and new_pos), f"{map_graph} | {wall_list} | {new_pos}"
         if new_pos.values not in map_graph.values:
             old_graph = map_graph.values
             old_graph.setdefault(position, set()).add(new_pos.values)
             old_graph.setdefault(new_pos.values, set()).add(position)
             map_graph.change(values=old_graph)
-            # Remove sharing knowledge about freely discovered cells with other agents (because of competition mode)
+            # Remove sharing knowledge about freely discovered cells with other agents (because of competition mode).
             # self.send(broadcast, tell, Belief("Sent_Graph", old_graph))
         if new_pos.values == position and direction != "stay":
             match direction:
-                case "up": wall_pos = (position[0],position[1]-1)
-                case "down": wall_pos = (position[0],position[1]+1)
-                case "left": wall_pos = (position[0]-1,position[1])
-                case "right": wall_pos = (position[0]+1,position[1])
+                case "up": wall_pos = (position[0], position[1] - 1)
+                case "down": wall_pos = (position[0], position[1] + 1)
+                case "left": wall_pos = (position[0] - 1, position[1])
+                case "right": wall_pos = (position[0] + 1, position[1])
             walls = wall_list.values
             if wall_pos not in walls:
                 walls.append(wall_pos)
                 self.print(f"Driver {self.my_name} found a wall at {wall_pos} added to {walls}")
-                # Remove sharing knowledge about discovered walls with other agents (because of competition mode)
+                # Remove sharing knowledge about discovered walls with other agents (because of competition mode).
                 # self.send(broadcast, tell, Belief("Sent_Walls", walls))
 
     # One step per cycle: learned policy or exploration.
-    @pl(gain, Goal("move"), Belief("agt_position", (Any,Any), "Map"))
+    @pl(gain, Goal("move"), Belief("agt_position", (Any, Any), "Map"))
     def make_move(self, src, position):
-        if self.get(Belief("mode", "use_learn", adds_event=False)) is not None:
-            direction, _ = self.get_best_action("Map",(position,))
+        mode_belief = self.get(Belief("mode", Any, adds_event=False))
+        if mode_belief is not None and mode_belief.values == "use_learn":
+            direction, _ = self.get_best_action("Map", (position,))
             self.print(f"From {position} Moving on a Learned Direction ({direction})")
         else:
             direction = next_explore_direction(self, position)
@@ -229,30 +230,34 @@ class Walker(Agent):
         self.perceive("Map")
         self.update_map(position, direction)
 
-        if not self.has(Belief("arrived_target", (Any,Any), "Map")):
+        if not self.has(Belief("arrived_target", (Any, Any, Any), "Map")):
             return False
 
-        target = self.get(Belief("arrived_target", (Any,Any), "Map"))
-        self.print(f"Driver {self.my_name} arrived at {target}")
+        target_percept = self.get(Belief("arrived_target", (Any, Any, Any), "Map"))
+        tx, ty, val = target_percept.values
+        target_pos = (tx, ty)
+        self.print(f"Driver {self.my_name} captured the target at {target_pos} worth {val} points!")
+        
         map_graph = self.get(Belief("Path_Graph", Any))
         wall_list = self.get(Belief("Wall_Set", Any))
-        print(f"\n=== notebook of {self.my_name} | "
+        print(f"\n=== Notebook of {self.my_name} | "
               f"{len(map_graph.values)} cells | {len(wall_list.values)} walls found ===")
         draw_ascii_map(map_graph.values, wall_list.values)
-        # The public state tells the capturer whether it took the last target.
+
         remaining = self.get(Belief("targets_left", Any, "Map"))
         if remaining is not None and remaining.values == 0:
             self.send(broadcast, tell, Belief("game_over", "over"))
             self.print("All targets captured - notifying the other walkers (game over)")
         else:
-            self.send(broadcast, tell, Belief("target_lost", target.values))
-            self.print(f"Target {target.values} captured - notifying the other walkers")
+            # Broadcast to other agents that this target and value were captured.
+            self.send(broadcast, tell, Belief("target_lost", (tx, ty, val)))
+            self.print(f"Target at {target_pos} ({val} pts) captured - notifying remaining walkers")
         self.stop_cycle()
 
     # Channel notification from the capturer: trained walkers switch to exploration.
-    @pl(gain, Belief("target_lost", (Any,Any)), plan_type=atomic)
+    @pl(gain, Belief("target_lost", (Any, Any, Any)), plan_type=atomic)
     def on_target_lost(self, src, *args):
-        mode_belief = self.get(Belief("mode", "use_learn", adds_event=False))
+        mode_belief = self.get(Belief("mode", Any, adds_event=False))
         if mode_belief is not None:
             mode_belief.change("mode", "explore", adds_event=False)
             self.print(f"Target captured by {src} - switching to exploration")
