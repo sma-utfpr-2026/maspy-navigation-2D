@@ -67,16 +67,18 @@ class Map(TargetTracker, Environment):
             self.map_size[0], self.map_size[1], targets, walls_prob, 2000)
 
         # Set distinct values for each target: Primary target (100 pts), Secondary target (40 pts).
-        t_list = sorted(list(targets))
-        self.target_values = {
+        # Shuffled so the 100-point target is not always the smallest (x, y).
+        t_list = sorted(targets)
+        random.shuffle(t_list)
+        target_values = {
             t_list[0]: 100,
             t_list[1]: 40
         }
 
         self.print(f"Targets created: {t_list[0]} (100 pts) and {t_list[1]} (40 pts)")
 
-        # Percept bank: stores coordinates and point value for each target.
-        for pos, val in self.target_values.items():
+        # Percept bank: the target percept is the only record of each target's value.
+        for pos, val in target_values.items():
             self.create(Percept("target", (pos[0], pos[1], val)))
 
         for wall in walls:
@@ -98,10 +100,10 @@ class Map(TargetTracker, Environment):
         terminated = False
 
         new_position = self.moviment(position, direction)
-        if new_position in self._target_positions():
+        target_values = self._target_values_map()
+        if new_position in target_values:
             # Reward is proportional to the target's value (+100 or +40).
-            val = self.target_values.get(new_position, 10)
-            reward = val
+            reward = target_values[new_position]
             terminated = True
         elif self.has(Percept("wall", new_position)) or position == new_position:
             reward = -10
@@ -128,7 +130,7 @@ class Map(TargetTracker, Environment):
         n_pos = self.get(Percept("agt_position", (Any, Any), agt), ck_group=True).values
 
         if n_pos in self._remaining_target_positions():
-            val = self.target_values.get(n_pos, 0)
+            val = self._target_values_map()[n_pos]
             self.print(f"{agt} in {pos} moved {direction} and captured the TARGET at {n_pos} (+{val} pts)!")
             self.create(Percept("arrived_target", (n_pos[0], n_pos[1], val), agt))
             self._capture(n_pos, val, agt)
